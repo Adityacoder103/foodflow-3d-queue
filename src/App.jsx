@@ -1,23 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Bell,
   ChefHat,
-  Clock3,
+  Clock,
   Moon,
   Search,
   Sparkles,
   Sun,
   Trash2,
-  Trophy,
   Plus,
   Minus,
   ArrowRight,
   Layers3,
   Cpu,
+  ShoppingCart,
+  CheckCircle2,
 } from 'lucide-react';
 import { menuItems } from './data/menu';
 import { Queue } from './data/queue';
+import * as THREE from 'three';
 
 const seedOrders = [
   { id: 101, customer: 'Rahul', items: [{ name: 'Cheese Burger', quantity: 2 }, { name: 'Coke Float', quantity: 1 }], total: 446, status: 'waiting', createdAt: '5:32 PM' },
@@ -35,6 +37,190 @@ const formatCurrency = (value) =>
 
 const getFoodById = (id) => menuItems.find((item) => item.id === id) || menuItems[0];
 
+// 3D Scene Component
+function ThreeDScene({ cameraView }) {
+  const mountRef = useRef(null);
+  const sceneRef = useRef(null);
+  const rendererRef = useRef(null);
+
+  useEffect(() => {
+    if (!mountRef.current) return;
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a1727);
+    scene.fog = new THREE.Fog(0x0a1727, 100, 1000);
+    sceneRef.current = scene;
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 20, 10);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    const pointLight = new THREE.PointLight(0x59c3ff, 0.5);
+    pointLight.position.set(-10, 10, 5);
+    scene.add(pointLight);
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.z = 5;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight * 0.5);
+    renderer.shadowMap.enabled = true;
+    rendererRef.current = renderer;
+    mountRef.current.appendChild(renderer.domElement);
+
+    // Create food models as geometric shapes with colors
+    const createFoodModel = (type) => {
+      const group = new THREE.Group();
+
+      if (type === 'burger') {
+        // Burger bottom bun
+        const bottomBun = new THREE.SphereGeometry(0.6, 32, 32);
+        const bunMaterial = new THREE.MeshStandardMaterial({ color: 0xd4a574 });
+        const bottom = new THREE.Mesh(bottomBun, bunMaterial);
+        bottom.position.y = -0.3;
+        bottom.castShadow = true;
+        group.add(bottom);
+
+        // Patty
+        const pattyGeometry = new THREE.CylinderGeometry(0.55, 0.55, 0.15, 32);
+        const pattyMaterial = new THREE.MeshStandardMaterial({ color: 0x4a3728 });
+        const patty = new THREE.Mesh(pattyGeometry, pattyMaterial);
+        patty.position.y = 0.2;
+        patty.castShadow = true;
+        group.add(patty);
+
+        // Cheese
+        const cheeseGeometry = new THREE.BoxGeometry(1, 0.1, 1);
+        const cheeseMaterial = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+        const cheese = new THREE.Mesh(cheeseGeometry, cheeseMaterial);
+        cheese.position.y = 0.35;
+        cheese.castShadow = true;
+        group.add(cheese);
+
+        // Top bun
+        const topBun = new THREE.SphereGeometry(0.6, 32, 32);
+        const top = new THREE.Mesh(topBun, bunMaterial);
+        top.position.y = 0.6;
+        top.scale.y = 0.5;
+        top.castShadow = true;
+        group.add(top);
+      } else if (type === 'pizza') {
+        const pizzaGeometry = new THREE.ConeGeometry(1.2, 0.3, 8);
+        const pizzaMaterial = new THREE.MeshStandardMaterial({ color: 0xff6b35 });
+        const pizza = new THREE.Mesh(pizzaGeometry, pizzaMaterial);
+        pizza.castShadow = true;
+        pizza.rotation.x = 0.3;
+        group.add(pizza);
+
+        // Pepperoni
+        for (let i = 0; i < 6; i++) {
+          const pepperoniGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 32);
+          const pepperoniMaterial = new THREE.MeshStandardMaterial({ color: 0xd32f2f });
+          const pepperoni = new THREE.Mesh(pepperoniGeometry, pepperoniMaterial);
+          const angle = (i / 6) * Math.PI * 2;
+          pepperoni.position.x = Math.cos(angle) * 0.6;
+          pepperoni.position.z = Math.sin(angle) * 0.6;
+          pepperoni.position.y = 0.15;
+          pepperoni.castShadow = true;
+          group.add(pepperoni);
+        }
+      } else if (type === 'drink') {
+        const glassGeometry = new THREE.CylinderGeometry(0.4, 0.4, 1.5, 32);
+        const glassMaterial = new THREE.MeshStandardMaterial({ color: 0x87ceeb, metalness: 0.8, roughness: 0.2 });
+        const glass = new THREE.Mesh(glassGeometry, glassMaterial);
+        glass.castShadow = true;
+        group.add(glass);
+
+        // Liquid
+        const liquidGeometry = new THREE.CylinderGeometry(0.35, 0.35, 1.2, 32);
+        const liquidMaterial = new THREE.MeshStandardMaterial({ color: 0xff6b35 });
+        const liquid = new THREE.Mesh(liquidGeometry, liquidMaterial);
+        liquid.position.y = 0.1;
+        liquid.castShadow = true;
+        group.add(liquid);
+      }
+
+      return group;
+    };
+
+    // Create models
+    const burger = createFoodModel('burger');
+    burger.position.set(-4, 0, 0);
+    scene.add(burger);
+
+    const pizza = createFoodModel('pizza');
+    pizza.position.set(0, 0, 0);
+    scene.add(pizza);
+
+    const drink = createFoodModel('drink');
+    drink.position.set(4, 0, 0);
+    scene.add(drink);
+
+    // Counter
+    const counterGeometry = new THREE.BoxGeometry(15, 0.5, 3);
+    const counterMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+    const counter = new THREE.Mesh(counterGeometry, counterMaterial);
+    counter.position.y = -1.5;
+    counter.receiveShadow = true;
+    scene.add(counter);
+
+    // Floor
+    const floorGeometry = new THREE.PlaneGeometry(50, 50);
+    const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x1a2332 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Animation loop
+    let animationId;
+    const animate = () => {
+      animationId = requestAnimationFrame(animate);
+
+      burger.rotation.y += 0.01;
+      pizza.rotation.y += 0.01;
+      drink.rotation.y += 0.01;
+
+      burger.position.y = Math.sin(Date.now() * 0.001) * 0.3;
+      pizza.position.y = Math.sin(Date.now() * 0.001 + Math.PI / 3) * 0.3;
+      drink.position.y = Math.sin(Date.now() * 0.001 + Math.PI / 1.5) * 0.3;
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    // Handle resize
+    const handleResize = () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight * 0.5);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animationId);
+      if (mountRef.current && rendererRef.current) {
+        mountRef.current.removeChild(rendererRef.current.domElement);
+      }
+      renderer.dispose();
+    };
+  }, [cameraView]);
+
+  return <div ref={mountRef} style={{ width: '100%', height: '50vh', position: 'relative' }} />;
+}
+
 function App() {
   const [theme, setTheme] = useState('dark');
   const [cameraView, setCameraView] = useState('queue');
@@ -43,7 +229,6 @@ function App() {
   const [selectedOrderId, setSelectedOrderId] = useState(102);
   const [searchTerm, setSearchTerm] = useState('');
   const [presentationMode, setPresentationMode] = useState(false);
-  const [soundOn, setSoundOn] = useState(false);
   const [cart, setCart] = useState([]);
   const [notifications, setNotifications] = useState([
     { id: 1, text: '🔔 Order #105 added to queue.' },
@@ -138,11 +323,6 @@ function App() {
     );
   };
 
-  const handleIsEmpty = () => {
-    const empty = queueState.isEmpty();
-    setPanelMessage(empty ? 'IS EMPTY()\nQueue is empty.' : 'Queue is NOT EMPTY.');
-  };
-
   const handleSize = () => {
     const size = queueState.size();
     setPanelMessage(`QUEUE SIZE\n${size} order${size === 1 ? '' : 's'} waiting.`);
@@ -190,17 +370,6 @@ function App() {
     addNotification(`🍔 Order #${front.id} is ready.`);
   };
 
-  const processFrontOrder = () => {
-    const front = queueState.peek();
-    if (!front) {
-      setPanelMessage('FRONT ORDER\nQueue is empty.');
-      return;
-    }
-
-    setPanelMessage(`FRONT ORDER\nOrder #${front.id}\n👨‍🍳 CHEF\nPREPARING`);
-    addNotification(`🔵 Front order #${front.id} is highlighted.`);
-  };
-
   const selectedOrder =
     queueOrders.find((order) => order.id === selectedOrderId) ||
     completedOrders.find((order) => order.id === selectedOrderId) ||
@@ -208,19 +377,6 @@ function App() {
     null;
 
   const queuePosition = selectedOrder ? queueOrders.findIndex((order) => order.id === selectedOrder.id) + 1 : 0;
-
-  const handleDragOver = (event) => event.preventDefault();
-
-  const handleDrop = (id) => {
-    const frontId = frontOrder ? frontOrder.id : null;
-    if (frontId && id !== frontId && id > frontId) {
-      setPanelMessage('⚠ FIFO RULE\nOrder #104 cannot be processed yet.\nOrder #101 is ahead in the queue.');
-      addNotification('⚠ FIFO Rule Protected');
-      return;
-    }
-    setSelectedOrderId(id);
-    setPanelMessage(`Order #${id}\nRepositioned in valid queue order.`);
-  };
 
   const filteredMenu = menuItems.filter((item) => {
     const search = searchTerm.toLowerCase();
@@ -240,106 +396,26 @@ function App() {
           <div className="brand-mark">F</div>
           <div>
             <div className="eyebrow">FoodFlow</div>
-            <div className="brand-name">Queue Dining Studio</div>
+            <div className="brand-name">3D Queue Dining</div>
           </div>
         </div>
-
-        <nav className="nav-actions">
-          <button className="nav-button active">Overview</button>
-          <button className="nav-button">3D Queue</button>
-          <button className="nav-button">Kitchen</button>
-          <button className="nav-button">Analytics</button>
-        </nav>
 
         <div className="header-actions">
           <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="toggle theme">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button className="icon-button" onClick={() => setSoundOn((prev) => !prev)} aria-label="sound toggle">
+          <button className="icon-button" onClick={() => addNotification('Sound toggled')} aria-label="sound toggle">
             <Bell size={18} />
           </button>
           <button className="primary-btn" onClick={() => setPresentationMode((prev) => !prev)}>
-            {presentationMode ? 'Exit Demo' : '🎓 Presentation Mode'}
+            {presentationMode ? 'Exit Demo' : '🎓 Demo'}
           </button>
         </div>
       </header>
 
       <main className="page-shell">
-        <section className="hero-panel glass-panel">
-          <div className="hero-copy">
-            <p className="label-pill">Interactive food-order queue system</p>
-            <h1>3D FoodFlow experience with real FIFO queue logic.</h1>
-            <p className="lead">
-              Premium restaurant simulation where orders move through queue, kitchen, and completion using a real FIFO queue data structure.
-            </p>
-
-            <div className="hero-cta-row">
-              <button className="primary-btn large" onClick={placeOrder}>Place Order</button>
-              <button className="secondary-btn large" onClick={() => setCameraView('queue')}>Queue View</button>
-            </div>
-
-            <div className="mini-stats-grid">
-              <div className="mini-stat">
-                <span className="mini-title">Queue</span>
-                <strong>{queueState.size()}</strong>
-              </div>
-              <div className="mini-stat">
-                <span className="mini-title">Prep</span>
-                <strong>{stats.preparing}</strong>
-              </div>
-              <div className="mini-stat">
-                <span className="mini-title">Ready</span>
-                <strong>{stats.ready}</strong>
-              </div>
-            </div>
-          </div>
-
-          <div className="scene-shell">
-            <div className={`restaurant-scene ${cameraView}`}>
-              <div className="scene-floor" />
-              <div className="counter-3d">
-                <div className="counter-top" />
-                <div className="counter-surface" />
-              </div>
-
-              <motion.div className="food-entity burger-entity" whileHover={{ rotateY: 22, scale: 1.08 }} onClick={() => setSelectedFood(getFoodById('cheese-burger'))}>
-                <div className="food-icon">🍔</div>
-              </motion.div>
-
-              <motion.div className="food-entity pizza-entity" whileHover={{ rotateY: -20, scale: 1.08 }} onClick={() => setSelectedFood(getFoodById('pepperoni-pizza'))}>
-                <div className="food-icon">🍕</div>
-              </motion.div>
-
-              <motion.div className="food-entity drink-entity" whileHover={{ rotateY: 18, scale: 1.06 }} onClick={() => setSelectedFood(getFoodById('coke-float'))}>
-                <div className="food-icon">🥤</div>
-              </motion.div>
-
-              <motion.div className="chef-avatar" animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 2.4 }} onClick={() => setCameraView('kitchen')}>
-                <div className="chef-head">👨‍🍳</div>
-                <div className="chef-body" />
-              </motion.div>
-
-              <div className="queue-zone">
-                <div className="queue-pill">FRONT</div>
-                <div className="queue-line" />
-                {queueOrders.slice(0, 4).map((order, idx) => (
-                  <div key={order.id} className={`queue-card ${idx === 0 ? 'small' : ''}`}>#{order.id}</div>
-                ))}
-                <div className="queue-pill rear">REAR</div>
-              </div>
-
-              <motion.div className="floating-order-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-                <span>#105</span>
-              </motion.div>
-
-              <div className="camera-surface">
-                <button className="area-button" onClick={() => setCameraView('kitchen')}>KITCHEN</button>
-                <button className="area-button" onClick={() => setCameraView('queue')}>QUEUE</button>
-                <button className="area-button" onClick={() => setCameraView('customer')}>MENU</button>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* 3D Scene */}
+        <ThreeDScene cameraView={cameraView} />
 
         <section className="content-grid">
           <div className="menu-column glass-panel">
@@ -347,7 +423,7 @@ function App() {
               <h3>Premium Menu</h3>
               <div className="search-box">
                 <Search size={14} />
-                <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search food or category" />
+                <input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search food..." />
               </div>
             </div>
 
@@ -356,42 +432,31 @@ function App() {
                 <motion.article
                   key={food.id}
                   className={`food-card ${selectedFood.id === food.id ? 'selected' : ''}`}
-                  whileHover={{ y: -8, rotateX: 4, rotateY: -4 }}
+                  whileHover={{ y: -12, scale: 1.05 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setSelectedFood(food)}
                 >
                   <div className="card-top-row">
-                    <div className="food-emoji" style={{ background: food.accent }}>{food.icon}</div>
+                    <div className="food-image" style={{ background: food.accent }}>
+                      <div className="food-emoji">{food.icon}</div>
+                    </div>
                     <button className="tiny-fav" type="button">♥</button>
                   </div>
 
                   <div className="food-body">
-                    <div className="food-title-block">
-                      <h4>{food.name}</h4>
-                      <span>{food.rating}⭐</span>
-                    </div>
+                    <h4>{food.name}</h4>
                     <p>{food.description}</p>
                     <div className="meta-line">
+                      <span>{food.rating}⭐</span>
                       <span>{food.calories} cal</span>
-                      <span>{food.category}</span>
                     </div>
-                    <ul>
-                      {food.ingredients.map((ingredient) => (
-                        <li key={ingredient}>{ingredient}</li>
-                      ))}
-                    </ul>
                   </div>
 
                   <div className="card-bottom-row">
                     <strong>{formatCurrency(food.price)}</strong>
-                    <div className="add-actions">
-                      <button type="button" className="small-icon" onClick={(e) => { e.stopPropagation(); setSelectedFood(food); }}>
-                        <Minus size={12} />
-                      </button>
-                      <span>1</span>
-                      <button type="button" className="small-icon" onClick={(e) => { e.stopPropagation(); addToCart(food); }}>
-                        <Plus size={12} />
-                      </button>
-                    </div>
+                    <button type="button" className="add-to-cart-btn" onClick={(e) => { e.stopPropagation(); addToCart(food); }}>
+                      <Plus size={16} />
+                    </button>
                   </div>
                 </motion.article>
               ))}
@@ -401,64 +466,38 @@ function App() {
           <div className="right-stack">
             <aside className="cart-panel glass-panel">
               <div className="section-heading-row">
-                <h3>Cart / Tray</h3>
-                <div className="badge-pill">{cart.reduce((sum, item) => sum + item.quantity, 0)} items</div>
+                <h3><ShoppingCart size={18} /> Cart</h3>
+                <div className="badge-pill">{cart.reduce((sum, item) => sum + item.quantity, 0)}</div>
               </div>
 
               <div className="cart-side-items">
                 {cart.length === 0 ? (
-                  <div className="empty-state">No food selected yet.</div>
+                  <div className="empty-state">No items yet</div>
                 ) : (
                   cart.map((item) => (
-                    <div className="cart-item" key={item.id}>
+                    <motion.div className="cart-item" key={item.id} layout>
                       <div>
                         <strong>{item.name}</strong>
-                        <small>{formatCurrency(item.price)} each</small>
+                        <small>{formatCurrency(item.price)}</small>
                       </div>
                       <div className="mini-controls">
                         <button type="button" onClick={() => adjustCartQuantity(item.id, -1)}><Minus size={12} /></button>
                         <span>{item.quantity}</span>
                         <button type="button" onClick={() => adjustCartQuantity(item.id, 1)}><Plus size={12} /></button>
-                        <button type="button" className="remove-btn" onClick={() => adjustCartQuantity(item.id, -item.quantity)}>
-                          <Trash2 size={12} />
-                        </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 )}
               </div>
 
               <div className="totals-box">
                 <div><span>Subtotal</span><strong>{formatCurrency(subtotal)}</strong></div>
-                <div><span>Delivery</span><strong>{formatCurrency(deliveryCharge)}</strong></div>
                 <div className="grand-total"><span>Total</span><strong>{formatCurrency(total)}</strong></div>
               </div>
 
-              <button type="button" className="primary-btn full" onClick={placeOrder}>PLACE ORDER</button>
-            </aside>
-
-            <aside className="tracker-panel glass-panel">
-              <div className="section-heading-row">
-                <h3>Track Your Order</h3>
-                <Clock3 size={16} />
-              </div>
-
-              <div className="track-input">
-                <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Order ID #104" />
-                <button type="button">TRACK</button>
-              </div>
-
-              <div className="timeline">
-                <p>Order #104</p>
-                <ul>
-                  <li className="done">✓ Order Placed</li>
-                  <li className="done">✓ Added to Queue</li>
-                  <li className="active">● Waiting</li>
-                  <li>○ Preparing</li>
-                  <li>○ Ready</li>
-                  <li>○ Completed</li>
-                </ul>
-              </div>
+              <motion.button type="button" className="primary-btn full" onClick={placeOrder} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <CheckCircle2 size={18} /> PLACE ORDER
+              </motion.button>
             </aside>
           </div>
         </section>
@@ -466,217 +505,62 @@ function App() {
         <section className="queue-kitchen-grid">
           <div className="queue-panel glass-panel">
             <div className="section-heading-row">
-              <h3>3D Queue / FIFO</h3>
-              <div className="queue-type-pills">
-                <button type="button" className="small-pill" onClick={handlePeek}>PEEK</button>
-                <button type="button" className="small-pill" onClick={handleSize}>SIZE</button>
-                <button type="button" className="small-pill" onClick={handleIsEmpty}>IS EMPTY</button>
-              </div>
+              <h3>FIFO Queue</h3>
             </div>
 
-            <div className="queue-visualizer" onDragOver={handleDragOver}>
+            <div className="queue-visualizer">
               {queueOrders.map((order, index) => {
                 const isFront = index === 0;
-                const match = searchTerm && order.id.toString().includes(searchTerm.replace('#', ''));
                 return (
                   <motion.div
                     key={order.id}
-                    draggable
-                    onDragStart={() => setSelectedOrderId(order.id)}
-                    onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(order.id)}
-                    className={`queue-node ${isFront ? 'front' : ''} ${match ? 'search-match' : ''}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    className={`queue-node ${isFront ? 'front' : ''}`}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
                     onClick={() => setSelectedOrderId(order.id)}
+                    whileHover={{ scale: 1.05 }}
                   >
                     <span className="queue-id">#{order.id}</span>
                     <small>{order.customer}</small>
-                    <div className="queue-status-note">{order.status}</div>
+                    <div className="queue-status">{order.status}</div>
                   </motion.div>
                 );
               })}
             </div>
 
             <div className="queue-control-panel">
-              <button type="button" className="control-btn green" onClick={placeOrder}>🟢 ENQUEUE</button>
-              <button type="button" className="control-btn blue" onClick={handlePeek}>🔵 PEEK</button>
-              <button type="button" className="control-btn orange" onClick={handleDequeue}>🟠 DEQUEUE</button>
-              <button type="button" className="control-btn neutral" onClick={handleIsEmpty}>⚪ IS EMPTY</button>
-              <button type="button" className="control-btn slate" onClick={handleSize}>📊 SIZE</button>
+              <motion.button type="button" className="control-btn" onClick={handlePeek} whileHover={{ scale: 1.05 }}>PEEK</motion.button>
+              <motion.button type="button" className="control-btn" onClick={handleSize} whileHover={{ scale: 1.05 }}>SIZE</motion.button>
+              <motion.button type="button" className="control-btn" onClick={handleDequeue} whileHover={{ scale: 1.05 }}>DEQUEUE</motion.button>
+              <motion.button type="button" className="control-btn" onClick={placeOrder} whileHover={{ scale: 1.05 }}>ENQUEUE</motion.button>
             </div>
           </div>
 
           <div className="kitchen-panel glass-panel">
             <div className="section-heading-row">
-              <h3>Kitchen Simulation</h3>
-              <ChefHat size={18} />
+              <h3><ChefHat size={18} /> Kitchen</h3>
             </div>
 
-            <div className="kitchen-scene">
-              <div className="kitchen-steps">
-                <span>ORDER</span>
-                <ArrowRight size={14} />
-                <span>KITCHEN</span>
-                <ArrowRight size={14} />
-                <span>👨‍🍳</span>
-                <ArrowRight size={14} />
-                <span>🍳</span>
-                <ArrowRight size={14} />
-                <span>READY</span>
+            <div className="prep-box">
+              <div className="prep-badge">{frontOrder ? `Order #${frontOrder.id}` : 'No order'}</div>
+              <div className="progress-bar">
+                <motion.div className="progress-fill" animate={{ width: '80%' }} transition={{ duration: 2 }} />
               </div>
+              <div className="prep-meta">Preparing...</div>
+            </div>
 
-              <div className="prep-box">
-                <div className="prep-badge">{frontOrder ? `Order #${frontOrder.id}` : 'No order'}</div>
-                <div className="progress-label">Preparing...</div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: '80%' }} />
-                </div>
-                <div className="prep-meta">
-                  <span>Estimated time: 00:32</span>
-                  <span>80%</span>
-                </div>
-              </div>
-
-              <div className="kitchen-actions">
-                <button type="button" className="primary-btn" onClick={prepareFrontOrder}>START PREPARING</button>
-                <button type="button" className="secondary-btn" onClick={finishFrontOrder}>READY</button>
-              </div>
+            <div className="kitchen-actions">
+              <motion.button type="button" className="primary-btn" onClick={prepareFrontOrder} whileHover={{ scale: 1.05 }}>START</motion.button>
+              <motion.button type="button" className="secondary-btn" onClick={finishFrontOrder} whileHover={{ scale: 1.05 }}>READY</motion.button>
             </div>
           </div>
         </section>
 
-        <section className="bottom-grid">
-          <div className="detail-panel glass-panel">
-            <div className="section-heading-row">
-              <h3>Order Detail</h3>
-              <Sparkles size={16} />
-            </div>
-
-            {selectedOrder ? (
-              <div className="order-details-card">
-                <div className="order-header-row">
-                  <h4>Order #{selectedOrder.id}</h4>
-                  <span className="badge-pill">{selectedOrder.status}</span>
-                </div>
-                <div className="detail-grid">
-                  <div>
-                    <label>Customer</label>
-                    <strong>{selectedOrder.customer}</strong>
-                  </div>
-                  <div>
-                    <label>Total</label>
-                    <strong>{formatCurrency(selectedOrder.total)}</strong>
-                  </div>
-                  <div>
-                    <label>Queue Position</label>
-                    <strong>{queuePosition || 1}</strong>
-                  </div>
-                  <div>
-                    <label>Created</label>
-                    <strong>{selectedOrder.createdAt}</strong>
-                  </div>
-                </div>
-                <div className="detail-items-list">
-                  {selectedOrder.items.map((item, index) => (
-                    <div className="detail-item" key={`${selectedOrder.id}-${index}`}>
-                      <span>{item.name}</span>
-                      <strong>× {item.quantity}</strong>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="front-flag-row">
-                  {frontOrder && frontOrder.id === selectedOrder.id ? (
-                    <button type="button" className="primary-btn" onClick={processFrontOrder}>PROCESS ORDER</button>
-                  ) : (
-                    <button type="button" className="secondary-btn" onClick={() => setPanelMessage('🚫 Cannot Process\nQueue follows FIFO.\nOrder #101 must be processed first.')}>PROCESS ORDER</button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="empty-state">No order selected.</div>
-            )}
-          </div>
-
-          <div className="notification-panel glass-panel">
-            <div className="section-heading-row">
-              <h3>Notification Center</h3>
-              <Bell size={16} />
-            </div>
-            <div className="notification-list">
-              {notifications.map((note) => (
-                <div className="notification-item" key={note.id}>{note.text}</div>
-              ))}
-            </div>
-          </div>
-
-          <div className="analysis-panel glass-panel">
-            <div className="section-heading-row">
-              <h3>Live Queue Statistics</h3>
-              <Layers3 size={16} />
-            </div>
-            <div className="stats-grid">
-              {Object.entries(stats).map(([key, value]) => (
-                <div className="stat-card" key={key}>
-                  <span>{key.toUpperCase()}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="data-flow-panel glass-panel">
+        <section className="bottom-panel glass-panel">
           <div className="section-heading-row">
-            <h3>Queue Flow Visualizer</h3>
-            <Trophy size={16} />
+            <h3><Cpu size={18} /> Control Panel</h3>
           </div>
-          <div className="flow-steps">
-            <span>CUSTOMER</span>
-            <ArrowRight size={14} />
-            <span>PLACE ORDER</span>
-            <ArrowRight size={14} />
-            <span>ENQUEUE</span>
-            <ArrowRight size={14} />
-            <span>QUEUE</span>
-            <ArrowRight size={14} />
-            <span>FRONT</span>
-            <ArrowRight size={14} />
-            <span>PREPARE</span>
-            <ArrowRight size={14} />
-            <span>READY</span>
-            <ArrowRight size={14} />
-            <span>DEQUEUE</span>
-            <ArrowRight size={14} />
-            <span>COMPLETED</span>
-          </div>
-        </section>
-
-        <section className="bottom-row">
-          <div className="panel-message glass-panel">
-            <div className="section-heading-row">
-              <h3>Queue Control</h3>
-              <Cpu size={16} />
-            </div>
-            <pre>{panelMessage}</pre>
-          </div>
-
-          <div className="food-details glass-panel">
-            <div className="section-heading-row">
-              <h3>Selected Food</h3>
-              <Sparkles size={16} />
-            </div>
-            <div className="selected-food-hero">
-              <div className="food-emoji large" style={{ background: selectedFood.accent }}>{selectedFood.icon}</div>
-              <div>
-                <h4>{selectedFood.name}</h4>
-                <p>{selectedFood.description}</p>
-                <strong>{formatCurrency(selectedFood.price)}</strong>
-              </div>
-            </div>
-            <button type="button" className="primary-btn full" onClick={() => addToCart(selectedFood)}>ADD TO CART</button>
-          </div>
+          <pre>{panelMessage}</pre>
         </section>
       </main>
     </div>
