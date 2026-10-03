@@ -1,13 +1,11 @@
-import { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
   Bell,
   ChefHat,
   Clock3,
-  Eye,
   Moon,
   Search,
-  ShoppingCart,
   Sparkles,
   Sun,
   Trash2,
@@ -17,50 +15,15 @@ import {
   ArrowRight,
   Layers3,
   Cpu,
-  CheckCircle2,
 } from 'lucide-react';
 import { menuItems } from './data/menu';
 import { Queue } from './data/queue';
 
 const seedOrders = [
-  {
-    id: 101,
-    customer: 'Rahul',
-    items: [
-      { name: 'Cheese Burger', quantity: 2 },
-      { name: 'Coke Float', quantity: 1 },
-    ],
-    total: 446,
-    status: 'waiting',
-    createdAt: '5:32 PM',
-  },
-  {
-    id: 102,
-    customer: 'Aisha',
-    items: [
-      { name: 'Pepperoni Pizza', quantity: 1 },
-      { name: 'Loaded Fries', quantity: 1 },
-    ],
-    total: 358,
-    status: 'waiting',
-    createdAt: '5:38 PM',
-  },
-  {
-    id: 103,
-    customer: 'Karan',
-    items: [{ name: 'Spicy Noodles', quantity: 1 }],
-    total: 189,
-    status: 'waiting',
-    createdAt: '5:41 PM',
-  },
-  {
-    id: 104,
-    customer: 'Nia',
-    items: [{ name: 'Chocolate Cake', quantity: 2 }],
-    total: 258,
-    status: 'waiting',
-    createdAt: '5:46 PM',
-  },
+  { id: 101, customer: 'Rahul', items: [{ name: 'Cheese Burger', quantity: 2 }, { name: 'Coke Float', quantity: 1 }], total: 446, status: 'waiting', createdAt: '5:32 PM' },
+  { id: 102, customer: 'Aisha', items: [{ name: 'Pepperoni Pizza', quantity: 1 }, { name: 'Loaded Fries', quantity: 1 }], total: 358, status: 'waiting', createdAt: '5:38 PM' },
+  { id: 103, customer: 'Karan', items: [{ name: 'Spicy Noodles', quantity: 1 }], total: 189, status: 'waiting', createdAt: '5:41 PM' },
+  { id: 104, customer: 'Nia', items: [{ name: 'Chocolate Cake', quantity: 2 }], total: 258, status: 'waiting', createdAt: '5:46 PM' },
 ];
 
 const formatCurrency = (value) =>
@@ -70,55 +33,51 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 0,
   }).format(value);
 
-const getOrderSummary = (items) =>
-  items
-    .map((item) => `${item.name} × ${item.quantity}`)
-    .join(', ');
-
 const getFoodById = (id) => menuItems.find((item) => item.id === id) || menuItems[0];
 
 function App() {
   const [theme, setTheme] = useState('dark');
   const [cameraView, setCameraView] = useState('queue');
-  const [panelMessage, setPanelMessage] = useState('PEEK()\nFront Order: #102');
+  const [panelMessage, setPanelMessage] = useState('PEEK()\nFront Order:\n#102\nNo order was removed.');
   const [selectedFood, setSelectedFood] = useState(menuItems[0]);
   const [selectedOrderId, setSelectedOrderId] = useState(102);
-  const [orderNote, setOrderNote] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [presentationMode, setPresentationMode] = useState(false);
   const [soundOn, setSoundOn] = useState(false);
   const [cart, setCart] = useState([]);
-  const [queueOrderCounter, setQueueOrderCounter] = useState(104);
   const [notifications, setNotifications] = useState([
     { id: 1, text: '🔔 Order #105 added to queue.' },
     { id: 2, text: '👨‍🍳 Order #101 is being prepared.' },
     { id: 3, text: '✅ Order #101 completed.' },
   ]);
 
-  const queue = useMemo(() => {
-    const q = new Queue();
-    seedOrders.forEach((order) => q.enqueue(order));
-    return q;
-  }, []);
+  const [queueState] = useState(() => {
+    const queue = new Queue();
+    seedOrders.forEach((order) => queue.enqueue(order));
+    return queue;
+  });
 
-  const [queueOrders, setQueueOrders] = useState(() => queue.getAllOrders());
+  const [queueOrders, setQueueOrders] = useState(() => queueState.getAllOrders());
   const [completedOrders, setCompletedOrders] = useState([{ id: 101, customer: 'Rahul', completedAt: '5:55 PM' }]);
   const [stats, setStats] = useState({ total: 124, waiting: 8, preparing: 2, ready: 3, completed: 111 });
+  const [orderCounter, setOrderCounter] = useState(105);
+
+  const frontOrder = queueState.peek();
 
   const addNotification = (text) => {
     const id = Date.now() + Math.random();
     setNotifications((prev) => [{ id, text }, ...prev].slice(0, 5));
   };
 
-  const syncQueue = () => setQueueOrders(queue.getAllOrders());
-
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const deliveryCharge = subtotal > 0 ? 35 : 0;
-  const total = subtotal + deliveryCharge;
+  const syncQueue = () => setQueueOrders(queueState.getAllOrders());
 
   useEffect(() => {
     document.body.classList.toggle('light-mode', theme === 'light');
   }, [theme]);
+
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const deliveryCharge = subtotal > 0 ? 35 : 0;
+  const total = subtotal + deliveryCharge;
 
   const addToCart = (food) => {
     setCart((prev) => {
@@ -130,7 +89,6 @@ function App() {
       }
       return [...prev, { ...food, quantity: 1 }];
     });
-
     addNotification(`🛒 ${food.name} added to cart.`);
   };
 
@@ -146,14 +104,14 @@ function App() {
 
   const placeOrder = () => {
     if (!cart.length) {
-      setOrderNote('Cart is empty');
+      setPanelMessage('Cart is empty.\nAdd food before placing order.');
       return;
     }
 
-    const nextOrderId = queueOrderCounter + 1;
+    const nextId = orderCounter;
     const customerName = ['Rahul', 'Aisha', 'Karan', 'Nia', 'Zoya'][Math.floor(Math.random() * 5)];
     const newOrder = {
-      id: nextOrderId,
+      id: nextId,
       customer: customerName,
       items: cart.map((item) => ({ name: item.name, quantity: item.quantity })),
       total,
@@ -161,85 +119,86 @@ function App() {
       createdAt: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
     };
 
-    queue.enqueue(newOrder);
-    setQueueOrderCounter(nextOrderId);
+    queueState.enqueue(newOrder);
+    setOrderCounter(nextId + 1);
     syncQueue();
     setSelectedOrderId(newOrder.id);
-    setPanelMessage(`ENQUEUE()\nOrder #${newOrder.id} entered the queue.`);
-    setOrderNote(`Order #${newOrder.id} created`);
+    setPanelMessage(`ORDER CREATED\n#${newOrder.id}\nENQUEUE()\nAdded to rear of queue.`);
     addNotification(`🔔 Order #${newOrder.id} added to queue.`);
     setStats((prev) => ({ ...prev, total: prev.total + 1, waiting: prev.waiting + 1 }));
     setCart([]);
   };
 
   const handlePeek = () => {
-    const frontOrder = queue.peek();
+    const front = queueState.peek();
     setPanelMessage(
-      frontOrder
-        ? `PEEK()\nFront Order:\n#${frontOrder.id}\nNo order was removed.`
+      front
+        ? `PEEK()\nFront Order:\n#${front.id}\nNo order was removed.`
         : 'PEEK()\nQueue is empty.'
     );
-    addNotification(frontOrder ? `👀 Front order is #${frontOrder.id}.` : '👀 Queue is empty.');
   };
 
   const handleIsEmpty = () => {
-    const empty = queue.isEmpty();
+    const empty = queueState.isEmpty();
     setPanelMessage(empty ? 'IS EMPTY()\nQueue is empty.' : 'Queue is NOT EMPTY.');
   };
 
   const handleSize = () => {
-    const size = queue.size();
+    const size = queueState.size();
     setPanelMessage(`QUEUE SIZE\n${size} order${size === 1 ? '' : 's'} waiting.`);
   };
 
   const handleDequeue = () => {
-    const removed = queue.dequeue();
+    const removed = queueState.dequeue();
     if (!removed) {
       setPanelMessage('DEQUEUE()\nQueue is empty.');
       return;
     }
 
     setCompletedOrders((prev) => [{ id: removed.id, customer: removed.customer, completedAt: 'just now' }, ...prev]);
-    setQueueOrders(queue.getAllOrders());
+    syncQueue();
     setPanelMessage(`DEQUEUE() executed\nOrder #${removed.id} completed.`);
     setStats((prev) => ({ ...prev, waiting: Math.max(0, prev.waiting - 1), completed: prev.completed + 1 }));
     addNotification(`✅ Order #${removed.id} completed.`);
   };
 
   const prepareFrontOrder = () => {
-    const frontOrder = queue.peek();
-    if (!frontOrder) {
-      setPanelMessage('Cannot prepare\nQueue is empty.');
+    const front = queueState.peek();
+    if (!front) {
+      setPanelMessage('START PREPARING\nQueue is empty.');
       return;
     }
 
-    frontOrder.status = 'preparing';
+    front.status = 'preparing';
     syncQueue();
     setStats((prev) => ({ ...prev, waiting: Math.max(0, prev.waiting - 1), preparing: prev.preparing + 1 }));
-    setPanelMessage(`START PREPARING\nOrder #${frontOrder.id}\nPreparing... 80%`);
-    addNotification(`👨‍🍳 Order #${frontOrder.id} is being prepared.`);
+    setPanelMessage(`START PREPARING\nOrder #${front.id}\nPreparing... 80%`);
+    addNotification(`👨‍🍳 Order #${front.id} is being prepared.`);
   };
 
   const finishFrontOrder = () => {
-    const frontOrder = queue.peek();
-    if (!frontOrder) return;
-
-    frontOrder.status = 'ready';
-    syncQueue();
-    setStats((prev) => ({ ...prev, preparing: Math.max(0, prev.preparing - 1), ready: prev.ready + 1 }));
-    setPanelMessage(`READY! ✅\nOrder #${frontOrder.id} is ready for pickup.`);
-    addNotification(`🍔 Order #${frontOrder.id} is ready.`);
-  };
-
-  const processFrontOrder = () => {
-    const frontOrder = queue.peek();
-    if (!frontOrder) {
-      setPanelMessage('No front order available.');
+    const front = queueState.peek();
+    if (!front) {
+      setPanelMessage('READY!\nNo front order available.');
       return;
     }
 
-    setPanelMessage(`FRONT ORDER\n${frontOrder.id}\nProcessing in kitchen.`);
-    addNotification(`🔵 Front order #${frontOrder.id} is highlighted.`);
+    front.status = 'ready';
+    syncQueue();
+    setStats((prev) => ({ ...prev, preparing: Math.max(0, prev.preparing - 1), ready: prev.ready + 1 }));
+    setPanelMessage(`READY! ✅\nOrder #${front.id} is ready for pickup.`);
+    addNotification(`🍔 Order #${front.id} is ready.`);
+  };
+
+  const processFrontOrder = () => {
+    const front = queueState.peek();
+    if (!front) {
+      setPanelMessage('FRONT ORDER\nQueue is empty.');
+      return;
+    }
+
+    setPanelMessage(`FRONT ORDER\nOrder #${front.id}\n👨‍🍳 CHEF\nPREPARING`);
+    addNotification(`🔵 Front order #${front.id} is highlighted.`);
   };
 
   const selectedOrder =
@@ -248,7 +207,6 @@ function App() {
     queueOrders[0] ||
     null;
 
-  const frontOrder = queue.peek();
   const queuePosition = selectedOrder ? queueOrders.findIndex((order) => order.id === selectedOrder.id) + 1 : 0;
 
   const handleDragOver = (event) => event.preventDefault();
@@ -261,7 +219,7 @@ function App() {
       return;
     }
     setSelectedOrderId(id);
-    setPanelMessage(`Order #${id}\nRepositioned in queue.`);
+    setPanelMessage(`Order #${id}\nRepositioned in valid queue order.`);
   };
 
   const filteredMenu = menuItems.filter((item) => {
@@ -274,7 +232,7 @@ function App() {
   });
 
   return (
-    <div className={`app-shell ${theme}`}>
+    <div className={`app-shell ${theme} ${presentationMode ? 'presentation' : ''}`}>
       <div className="app-glow" />
 
       <header className="topbar glass-panel">
@@ -294,10 +252,10 @@ function App() {
         </nav>
 
         <div className="header-actions">
-          <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>
+          <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="toggle theme">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button className="icon-button" onClick={() => setSoundOn((prev) => !prev)}>
+          <button className="icon-button" onClick={() => setSoundOn((prev) => !prev)} aria-label="sound toggle">
             <Bell size={18} />
           </button>
           <button className="primary-btn" onClick={() => setPresentationMode((prev) => !prev)}>
@@ -312,8 +270,7 @@ function App() {
             <p className="label-pill">Interactive food-order queue system</p>
             <h1>3D FoodFlow experience with real FIFO queue logic.</h1>
             <p className="lead">
-              A premium restaurant simulation where customer orders move through queue, kitchen,
-              and completion in a data-structure-first experience.
+              Premium restaurant simulation where orders move through queue, kitchen, and completion using a real FIFO queue data structure.
             </p>
 
             <div className="hero-cta-row">
@@ -324,7 +281,7 @@ function App() {
             <div className="mini-stats-grid">
               <div className="mini-stat">
                 <span className="mini-title">Queue</span>
-                <strong>{queue.size()}</strong>
+                <strong>{queueState.size()}</strong>
               </div>
               <div className="mini-stat">
                 <span className="mini-title">Prep</span>
@@ -345,36 +302,19 @@ function App() {
                 <div className="counter-surface" />
               </div>
 
-              <motion.div
-                className="food-entity burger-entity"
-                whileHover={{ rotateY: 22, scale: 1.08 }}
-                onClick={() => setSelectedFood(getFoodById('cheese-burger'))}
-              >
+              <motion.div className="food-entity burger-entity" whileHover={{ rotateY: 22, scale: 1.08 }} onClick={() => setSelectedFood(getFoodById('cheese-burger'))}>
                 <div className="food-icon">🍔</div>
               </motion.div>
 
-              <motion.div
-                className="food-entity pizza-entity"
-                whileHover={{ rotateY: -20, scale: 1.08 }}
-                onClick={() => setSelectedFood(getFoodById('pepperoni-pizza'))}
-              >
+              <motion.div className="food-entity pizza-entity" whileHover={{ rotateY: -20, scale: 1.08 }} onClick={() => setSelectedFood(getFoodById('pepperoni-pizza'))}>
                 <div className="food-icon">🍕</div>
               </motion.div>
 
-              <motion.div
-                className="food-entity drink-entity"
-                whileHover={{ rotateY: 18, scale: 1.06 }}
-                onClick={() => setSelectedFood(getFoodById('coke-float'))}
-              >
+              <motion.div className="food-entity drink-entity" whileHover={{ rotateY: 18, scale: 1.06 }} onClick={() => setSelectedFood(getFoodById('coke-float'))}>
                 <div className="food-icon">🥤</div>
               </motion.div>
 
-              <motion.div
-                className="chef-avatar"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 2.4 }}
-                onClick={() => setCameraView('kitchen')}
-              >
+              <motion.div className="chef-avatar" animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 2.4 }} onClick={() => setCameraView('kitchen')}>
                 <div className="chef-head">👨‍🍳</div>
                 <div className="chef-body" />
               </motion.div>
@@ -382,19 +322,13 @@ function App() {
               <div className="queue-zone">
                 <div className="queue-pill">FRONT</div>
                 <div className="queue-line" />
-                <div className="queue-card small">#101</div>
-                <div className="queue-card">#102</div>
-                <div className="queue-card">#103</div>
-                <div className="queue-card">#104</div>
+                {queueOrders.slice(0, 4).map((order, idx) => (
+                  <div key={order.id} className={`queue-card ${idx === 0 ? 'small' : ''}`}>#{order.id}</div>
+                ))}
                 <div className="queue-pill rear">REAR</div>
               </div>
 
-              <motion.div
-                className="floating-order-card"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
+              <motion.div className="floating-order-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
                 <span>#105</span>
               </motion.div>
 
@@ -427,7 +361,7 @@ function App() {
                 >
                   <div className="card-top-row">
                     <div className="food-emoji" style={{ background: food.accent }}>{food.icon}</div>
-                    <button className="tiny-fav">♥</button>
+                    <button className="tiny-fav" type="button">♥</button>
                   </div>
 
                   <div className="food-body">
@@ -450,11 +384,11 @@ function App() {
                   <div className="card-bottom-row">
                     <strong>{formatCurrency(food.price)}</strong>
                     <div className="add-actions">
-                      <button className="small-icon" onClick={(e) => { e.stopPropagation(); setSelectedFood(food); }}>
+                      <button type="button" className="small-icon" onClick={(e) => { e.stopPropagation(); setSelectedFood(food); }}>
                         <Minus size={12} />
                       </button>
                       <span>1</span>
-                      <button className="small-icon" onClick={(e) => { e.stopPropagation(); addToCart(food); }}>
+                      <button type="button" className="small-icon" onClick={(e) => { e.stopPropagation(); addToCart(food); }}>
                         <Plus size={12} />
                       </button>
                     </div>
@@ -482,10 +416,10 @@ function App() {
                         <small>{formatCurrency(item.price)} each</small>
                       </div>
                       <div className="mini-controls">
-                        <button onClick={() => adjustCartQuantity(item.id, -1)}><Minus size={12} /></button>
+                        <button type="button" onClick={() => adjustCartQuantity(item.id, -1)}><Minus size={12} /></button>
                         <span>{item.quantity}</span>
-                        <button onClick={() => adjustCartQuantity(item.id, 1)}><Plus size={12} /></button>
-                        <button className="remove-btn" onClick={() => adjustCartQuantity(item.id, -item.quantity)}>
+                        <button type="button" onClick={() => adjustCartQuantity(item.id, 1)}><Plus size={12} /></button>
+                        <button type="button" className="remove-btn" onClick={() => adjustCartQuantity(item.id, -item.quantity)}>
                           <Trash2 size={12} />
                         </button>
                       </div>
@@ -500,7 +434,7 @@ function App() {
                 <div className="grand-total"><span>Total</span><strong>{formatCurrency(total)}</strong></div>
               </div>
 
-              <button className="primary-btn full" onClick={placeOrder}>PLACE ORDER</button>
+              <button type="button" className="primary-btn full" onClick={placeOrder}>PLACE ORDER</button>
             </aside>
 
             <aside className="tracker-panel glass-panel">
@@ -511,7 +445,7 @@ function App() {
 
               <div className="track-input">
                 <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Order ID #104" />
-                <button>TRACK</button>
+                <button type="button">TRACK</button>
               </div>
 
               <div className="timeline">
@@ -534,9 +468,9 @@ function App() {
             <div className="section-heading-row">
               <h3>3D Queue / FIFO</h3>
               <div className="queue-type-pills">
-                <button className="small-pill" onClick={handlePeek}>PEEK</button>
-                <button className="small-pill" onClick={handleSize}>SIZE</button>
-                <button className="small-pill" onClick={handleIsEmpty}>IS EMPTY</button>
+                <button type="button" className="small-pill" onClick={handlePeek}>PEEK</button>
+                <button type="button" className="small-pill" onClick={handleSize}>SIZE</button>
+                <button type="button" className="small-pill" onClick={handleIsEmpty}>IS EMPTY</button>
               </div>
             </div>
 
@@ -565,11 +499,11 @@ function App() {
             </div>
 
             <div className="queue-control-panel">
-              <button className="control-btn green" onClick={placeOrder}>🟢 ENQUEUE</button>
-              <button className="control-btn blue" onClick={handlePeek}>🔵 PEEK</button>
-              <button className="control-btn orange" onClick={handleDequeue}>🟠 DEQUEUE</button>
-              <button className="control-btn neutral" onClick={handleIsEmpty}>⚪ IS EMPTY</button>
-              <button className="control-btn slate" onClick={handleSize}>📊 SIZE</button>
+              <button type="button" className="control-btn green" onClick={placeOrder}>🟢 ENQUEUE</button>
+              <button type="button" className="control-btn blue" onClick={handlePeek}>🔵 PEEK</button>
+              <button type="button" className="control-btn orange" onClick={handleDequeue}>🟠 DEQUEUE</button>
+              <button type="button" className="control-btn neutral" onClick={handleIsEmpty}>⚪ IS EMPTY</button>
+              <button type="button" className="control-btn slate" onClick={handleSize}>📊 SIZE</button>
             </div>
           </div>
 
@@ -605,8 +539,8 @@ function App() {
               </div>
 
               <div className="kitchen-actions">
-                <button className="primary-btn" onClick={prepareFrontOrder}>START PREPARING</button>
-                <button className="secondary-btn" onClick={finishFrontOrder}>READY</button>
+                <button type="button" className="primary-btn" onClick={prepareFrontOrder}>START PREPARING</button>
+                <button type="button" className="secondary-btn" onClick={finishFrontOrder}>READY</button>
               </div>
             </div>
           </div>
@@ -654,9 +588,9 @@ function App() {
 
                 <div className="front-flag-row">
                   {frontOrder && frontOrder.id === selectedOrder.id ? (
-                    <button className="primary-btn" onClick={processFrontOrder}>PROCESS ORDER</button>
+                    <button type="button" className="primary-btn" onClick={processFrontOrder}>PROCESS ORDER</button>
                   ) : (
-                    <button className="secondary-btn" onClick={() => setPanelMessage('🚫 Cannot Process\nQueue follows FIFO.\nOrder #101 must be processed first.')}>PROCESS ORDER</button>
+                    <button type="button" className="secondary-btn" onClick={() => setPanelMessage('🚫 Cannot Process\nQueue follows FIFO.\nOrder #101 must be processed first.')}>PROCESS ORDER</button>
                   )}
                 </div>
               </div>
@@ -741,7 +675,7 @@ function App() {
                 <strong>{formatCurrency(selectedFood.price)}</strong>
               </div>
             </div>
-            <button className="primary-btn full" onClick={() => addToCart(selectedFood)}>ADD TO CART</button>
+            <button type="button" className="primary-btn full" onClick={() => addToCart(selectedFood)}>ADD TO CART</button>
           </div>
         </section>
       </main>
